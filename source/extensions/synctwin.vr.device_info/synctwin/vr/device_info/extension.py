@@ -10,21 +10,20 @@
 
 import omni.ext
 import omni.ui as ui
+import carb
+from omni.kit.xr.core import (
+    XRCore,
+    XRCoreEventType,
+    XRInputDevice,
 
-
-# Functions and vars are available to other extensions as usual in python:
-# `synctwin.vr.device_info.some_public_function(x)`
-def some_public_function(x: int):
-    """This is a public function that can be called from other extensions."""
-    print(f"[synctwin.vr.device_info] some_public_function was called with {x}")
-    return x ** x
+)
 
 
 # Any class derived from `omni.ext.IExt` in the top level module (defined in
 # `python.modules` of `extension.toml`) will be instantiated when the extension
 # gets enabled, and `on_startup(ext_id)` will be called. Later when the
 # extension gets disabled on_shutdown() is called.
-class MyExtension(omni.ext.IExt):
+class DeviceInfoExtension(omni.ext.IExt):
     """This extension manages a simple counter UI."""
     # ext_id is the current extension id. It can be used with the extension
     # manager to query additional information, like where this extension is
@@ -39,23 +38,39 @@ class MyExtension(omni.ext.IExt):
         )
         with self._window.frame:
             with ui.VStack():
-                label = ui.Label("")
+                label = ui.Label("- Device Info -", height=30)
+                self._device_info = ui.Label("- need to start VR mode -")
 
-                def on_click():
-                    self._count += 1
-                    label.text = f"count: {self._count}"
+        self.xr_enabled = False
+        xr_core = XRCore.get_singleton()
 
-                def on_reset():
-                    self._count = 0
-                    label.text = "empty"
+        message_bus = xr_core.get_message_bus()
+        self.xr_enabled_sub = message_bus.create_subscription_to_pop_by_type(XRCoreEventType.xr_enabled, self.on_xr_enable)
+        self.xr_disabled_sub = message_bus.create_subscription_to_pop_by_type(XRCoreEventType.xr_disabled, self.on_xr_disable)
+        self.update_device_info()
 
-                on_reset()
-
-                with ui.HStack():
-                    ui.Button("Add", clicked_fn=on_click)
-                    ui.Button("Reset", clicked_fn=on_reset)
 
     def on_shutdown(self):
         """This is called every time the extension is deactivated. It is used
         to clean up the extension state."""
         print("[synctwin.vr.device_info] Extension shutdown")
+
+    def on_xr_enable(self, event: XRCoreEventType):
+        self.xr_enabled = True
+        self.update_device_info()
+
+    def on_xr_disable(self, event: XRCoreEventType):
+        self.xr_enabled = False
+        self.update_device_info()
+
+    def update_device_info(self):
+        if self.xr_enabled:
+            self._device_info.text = "VR mode is enabled"
+            xr_core = XRCore.get_singleton()
+            num_devices = len(xr_core.get_all_input_devices())
+            info = f"Number of devices: {num_devices}"
+            for input_device in xr_core.get_all_input_devices():
+                info += f"\n{input_device.get_name()}"
+            self._device_info.text = info
+        else:
+            self._device_info.text = "- please start VR mode -"
