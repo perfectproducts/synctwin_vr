@@ -71,6 +71,10 @@ class DeviceInfoExtension(omni.ext.IExt):
             info = f"Number of devices: {num_devices}"
             for input_device in xr_core.get_all_input_devices():
                 info += f"\n{input_device.get_name()}"
+                input_names = input_device.get_input_names()
+                for input_name in input_names:
+                    info += f"\n       o {input_name}"
+
             self._device_info.text = info
         else:
             self._device_info.text = "- please start VR mode -"
